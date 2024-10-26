@@ -1,74 +1,68 @@
 #!/usr/bin/python3
+"""Write a script that reads stdin line by line and computes metrics:
+
+Input format: <IP Address> - [<date>] "GET /projects/260 HTTP/1.1"
+<status code> <file size> (if the format is not this one, the line
+must be skipped)
+After every 10 lines and/or a keyboard interruption (CTRL + C),
+print these statistics from the beginning:
+Total file size: File size: <total size>
+where <total size> is the sum of all previous <file size>
+(see input format above)
+Number of lines by status code:
+possible status code: 200, 301, 400, 401, 403, 404, 405 and 500
+if a status code doesn’t appear or is not an integer,
+don’t print anything for this status code
+format: <status code>: <number>
+status codes should be printed in ascending order
+
+line list = [<IP Address>, -, [<date>], "GET /projects/260 HTTP/1.1",
+<status code>, <file size>]
 """
-Log stats module
-"""
+
+
 import sys
-from operator import itemgetter
 
+# store the count of all status codes in a dictionary
+status_codes_dict = {'200': 0, '301': 0, '400': 0, '401': 0, '403': 0,
+                     '404': 0, '405': 0, '500': 0}
 
-def log_parser(log):
-    """
-    Parses log into different fields
-    """
-    log_fields = log.split()
-    file_size = int(log_fields[-1])
-    status_code = log_fields[-2]
-    return status_code, file_size
+total_size = 0
+count = 0  # keep count of the number lines counted
 
+try:
+    for line in sys.stdin:
+        line_list = line.split(" ")
 
-def validate_format(log):
-    """
-    Validates log format
-    """
-    return False if len(log.split()) < 7 else True
+        if len(line_list) > 4:
+            status_code = line_list[-2]
+            file_size = int(line_list[-1])
 
+            # check if the status code receive exists in the dictionary and
+            # increment its count
+            if status_code in status_codes_dict.keys():
+                status_codes_dict[status_code] += 1
 
-def validate_status_code(status_code):
-    """
-    Check if status code entry is valid
-    """
-    valid_status_codes = ["200", "301", "400", "401",
-                          "403", "404", "405", "500"]
-    return True if status_code in valid_status_codes else False
-
-
-def print_log(file_size, status_codes) -> None:
-    """
-    Prints out log files
-    """
-    sorted_status_codes = sorted(status_codes.items(), key=itemgetter(0))
-    print('File size: {}'.format(file_size))
-    for code_count in sorted_status_codes:
-        key = code_count[0]
-        value = code_count[1]
-        print("{}: {}".format(key, value))
-
-
-def main():
-    """
-    Reads logs from std in and prints out statistic
-    on status code and file size
-    """
-    status_codes_count = {}
-    total_size = 0
-    log_count = 0
-    try:
-        for log in sys.stdin:
-            log_count += 1
-            if not validate_format(log):
-                continue
-            status_code, file_size = log_parser(log)
+            # update total size
             total_size += file_size
-            if validate_status_code(status_code):
-                entry = {status_code:
-                         status_codes_count.get(status_code, 0) + 1}
-                status_codes_count.update(entry)
-            if not log_count % 10:
-                print_log(total_size, status_codes_count)
-    except KeyboardInterrupt:
-        print_log(total_size, status_codes_count)
-    print_log(total_size, status_codes_count)
 
+            # update count of lines
+            count += 1
 
-if __name__ == '__main__':
-    main()
+        if count == 10:
+            count = 0  # reset count
+            print('File size: {}'.format(total_size))
+
+            # print out status code counts
+            for key, value in sorted(status_codes_dict.items()):
+                if value != 0:
+                    print('{}: {}'.format(key, value))
+
+except Exception as err:
+    pass
+
+finally:
+    print('File size: {}'.format(total_size))
+    for key, value in sorted(status_codes_dict.items()):
+        if value != 0:
+            print('{}: {}'.format(key, value))

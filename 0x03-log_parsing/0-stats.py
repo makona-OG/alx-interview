@@ -1,57 +1,50 @@
 #!/usr/bin/python3
+"""
+log parsing
+"""
+
 import sys
-import signal
+import re
 
-# Initialize total file size and dictionary for status codes
-total_size = 0
-status_codes = {200: 0, 301: 0, 400: 0, 401: 0, 403: 0, 404: 0, 405: 0, 500: 0}
-line_count = 0
 
-def print_stats():
-    """Prints the current stats of the log parsing"""
-    print("File size: {}".format(total_size))
-    for code in sorted(status_codes.keys()):
-        if status_codes[code] > 0:
-            print("{}: {}".format(code, status_codes[code]))
+def output(log: dict) -> None:
+    """
+    helper function to display stats
+    """
+    print("File size: {}".format(log["file_size"]))
+    for code in sorted(log["code_frequency"]):
+        if log["code_frequency"][code]:
+            print("{}: {}".format(code, log["code_frequency"][code]))
 
-def signal_handler(sig, frame):
-    """Handles keyboard interruption to print stats"""
-    print_stats()
-    sys.exit(0)
 
-# Set up signal handling for CTRL+C (SIGINT)
-signal.signal(signal.SIGINT, signal_handler)
+if __name__ == "__main__":
+    regex = re.compile(
+    r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3} - \[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d+\] "GET /projects/260 HTTP/1.1" (.{3}) (\d+)')  # nopep8
 
-try:
-    for line in sys.stdin:
-        try:
-            # Parse line using expected format
-            parts = line.split()
-            file_size = int(parts[-1])
-            status_code = int(parts[-2])
+    line_count = 0
+    log = {}
+    log["file_size"] = 0
+    log["code_frequency"] = {
+        str(code): 0 for code in [
+            200, 301, 400, 401, 403, 404, 405, 500]}
 
-            # Update total file size
-            total_size += file_size
+    try:
+        for line in sys.stdin:
+            line = line.strip()
+            match = regex.fullmatch(line)
+            if (match):
+                line_count += 1
+                code = match.group(1)
+                file_size = int(match.group(2))
 
-            # Update status code count if it is a known code
-            if status_code in status_codes:
-                status_codes[status_code] += 1
+                # File size
+                log["file_size"] += file_size
 
-            line_count += 1
+                # status code
+                if (code.isdecimal()):
+                    log["code_frequency"][code] += 1
 
-            # Print stats every 10 lines
-            if line_count % 10 == 0:
-                print_stats()
-
-        except (IndexError, ValueError):
-            # Skip line if it is incorrectly formatted
-            continue
-
-    # Print final stats after all lines are read
-    print_stats()
-
-except KeyboardInterrupt:
-    # Print stats if CTRL+C is pressed
-    print_stats()
-    sys.exit(0)
-
+                if (line_count % 10 == 0):
+                    output(log)
+    finally:
+        output(log)
